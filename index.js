@@ -115,5 +115,6 @@ const scrape = async (link) => {
 };
 
 scrape(
-  "https://www.yelp.com/search?find_desc=Home%20Improvement&find_loc=Boca%20Raton%2C%20FL"
+  "https://www.yelp.com/search?find_desc=Home%20Improvement&find_loc=Dallas%2C%20TX"
 );
+// "https://www.yelp.com/search?find_desc=Home%20Improvement&find_loc=Boca%20Raton%2C%20FL"
