@@ -58,63 +58,76 @@ const scrapeLink = async (page, data, writeStream) => {
   return newData;
 };
 
-const scrape = async (link) => {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
+const scrape = (links) => {
+  links.forEach(async (link) => {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
 
-  const page = await browser.newPage();
+    const page = await browser.newPage();
 
-  await page.goto(link);
+    await page.goto(link);
 
-  const html = await page.content();
-  const $ = cheerio.load(html);
+    const html = await page.content();
+    const $ = cheerio.load(html);
 
-  let lastPageNumber = $(".text-align--center__373c0__2n2yQ > span")
-    .text()
-    .split("of")[1]
-    .trim();
+    let lastPageNumber = $(".text-align--center__373c0__2n2yQ > span")
+      .text()
+      .split("of")[1]
+      .trim();
 
-  const rawDate = new Date().toString().split(" ");
-  const type = link.split("loc=")[1].split("%2C")[0];
-  const date = `${rawDate[1]}-${rawDate[2]}-${rawDate[3]}`;
-  const writeStream = fs.createWriteStream(`Yelp-${date}-${type}.txt`);
-  const pathName = writeStream.path;
+    const rawDate = new Date().toString().split(" ");
+    const type = link.split("loc=")[1].split("%2C")[0];
+    const date = `${rawDate[1]}-${rawDate[2]}-${rawDate[3]}`;
+    const writeStream = fs.createWriteStream(`Yelp-${date}-${type}.txt`);
+    const pathName = writeStream.path;
 
-  let data = [];
-  for (let i = 0; i < lastPageNumber; i++) {
-    console.log(`page ${i + 1}/${lastPageNumber}`);
+    let data = [];
+    for (let i = 0; i < lastPageNumber; i++) {
+      console.log(`page ${i + 1}/${lastPageNumber}`);
 
-    await page.waitFor(3000);
+      await page.waitFor(3000);
 
-    let results = await extractLinks(page);
-    data.push(...results);
+      let results = await extractLinks(page);
+      data.push(...results);
 
-    if (i != lastPageNumber - 1) {
-      await page.click(
-        "#wrap > div:nth-child(4) > div.lemon--div__373c0__1mboc.spinnerContainer__373c0__dHYYg.border-color--default__373c0__3-ifU.background-color--white__373c0__2uyKj > div > div.lemon--div__373c0__1mboc.leftRailContainer__373c0__390Ky.border-color--default__373c0__3-ifU > div.lemon--div__373c0__1mboc.leftRailMainContent__373c0__4Lx_e.padding-r5__373c0__126QE.padding-b5__373c0__3XORh.padding-l5__373c0__2Dc5X.border-color--default__373c0__3-ifU > div.lemon--div__373c0__1mboc.leftRailSearchResultsContainer__373c0__GUx8Y.border-color--default__373c0__3-ifU > div:nth-child(2) > div.lemon--div__373c0__1mboc.pagination__373c0__2FmRk.border--top__373c0__3gXLy.border--bottom__373c0__3qNtD.border-color--default__373c0__3-ifU > div:nth-child(1) > div > div:nth-child(11) > span > a"
-      );
+      if (i != lastPageNumber - 1) {
+        await page.waitForSelector(
+          ".lemon--div__373c0__1mboc > .lemon--div__373c0__1mboc:nth-child(11) > .lemon--span__373c0__3997G > .lemon--a__373c0__IEZFH > .lemon--span__373c0__3997G"
+        );
+        await page.click(
+          ".lemon--div__373c0__1mboc > .lemon--div__373c0__1mboc:nth-child(11) > .lemon--span__373c0__3997G > .lemon--a__373c0__IEZFH > .lemon--span__373c0__3997G"
+        );
+      }
+
+      continue;
     }
 
-    continue;
-  }
+    for (let j = 0; j < data.length; j++) {
+      console.log(`scraping link ${j + 1}/${data.length}`);
 
-  for (let j = 0; j < data.length; j++) {
-    console.log(`scraping link ${j + 1}/${data.length}`);
+      try {
+        await page.goto(data[j].link);
 
-    await page.goto(data[j].link);
+        await scrapeLink(page, data[j], writeStream);
+      } catch (e) {
+        console.log(`couldn't scrape ${data[j].link}`);
+      }
 
-    await scrapeLink(page, data[j], writeStream);
+      continue;
+    }
 
-    continue;
-  }
-
-  await browser.close();
-  await writeStream.end();
+    await browser.close();
+    await writeStream.end();
+    console.log(`Done scraping ${type}`);
+  });
 };
 
-// scrape(
-//   "https://www.yelp.com/search?find_desc=Home%20Improvement&find_loc=Dallas%2C%20TX"
-// );
-// "https://www.yelp.com/search?find_desc=Home%20Improvement&find_loc=Boca%20Raton%2C%20FL"
+scrape([
+  "https://www.yelp.com/search?find_desc=Home+Improvement&find_loc=Houston%2C+TX&ns=1",
+  "https://www.yelp.com/search?find_desc=Home%20Improvement&find_loc=Austin%2C%20TX",
+  "https://www.yelp.com/search?find_desc=Home+Improvement&find_loc=Atlanta%2C+GA&ns=1",
+  "https://www.yelp.com/search?find_desc=Home%20Improvement&find_loc=Chattanooga%2C%20GA",
+  "https://www.yelp.com/search?find_desc=Home%20Improvement&find_loc=Charlotte%2C%20NC",
+]);
